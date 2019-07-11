@@ -12,7 +12,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using System.Linq;
 using DSharpPlus.Entities;
-using WamWooWam.Core;
 using System.IO;
 using System.Net.Http;
 using Microsoft.EntityFrameworkCore;
@@ -101,7 +100,7 @@ namespace GaiaPins
             var messageLink = $"https://discordapp.com/channels/{message.Channel.GuildId}/{message.ChannelId}/{message.Id}";
             var embed = new DiscordEmbedBuilder()
                 .WithAuthor($"{message.Author.Username}", messageLink, message.Author.GetAvatarUrl(ImageFormat.Png, 128))
-                .WithDescription(message.Content.Truncate(1000))
+                .WithDescription(message.Content.Length <= 1000 ? message.Content : $"{message.Content.Substring(0, 997)}...")
                 .WithTimestamp(message.Timestamp)
                 .WithFooter($"In #{message.Channel.Name}");
 
