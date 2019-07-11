@@ -44,6 +44,6 @@ namespace GaiaPins.Data
     {
         public long Id { get; set; }
         public long GuildId { get; set; }
-        public long NewMessageId { get;set; }
+        public long NewMessageId { get; set; }
     }
 }
