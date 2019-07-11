@@ -1,0 +1,9 @@
+{
+  "Discord": {
+    "Token": "<token here>",
+    "Prefixes": "p;"
+  },
+  "Database": {
+    "ConnectionString": "Data Source=pins.db;"
+  }
+}
