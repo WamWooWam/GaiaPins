@@ -1,17 +1,15 @@
 ﻿using System;
 using System.IO;
-using DSharpPlus;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Console;
-using Microsoft.Extensions.DependencyInjection;
 using System.Threading.Tasks;
+using DSharpPlus;
 using DSharpPlus.CommandsNext;
 using GaiaPins.Data;
-using LogLevel = DSharpPlus.LogLevel;
-using MSLogLevel = Microsoft.Extensions.Logging.LogLevel;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using LogLevel = DSharpPlus.LogLevel;
 
 namespace GaiaPins
 {
