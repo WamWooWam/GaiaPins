@@ -1,15 +1,18 @@
 ﻿using System;
 using System.IO;
-using System.Threading.Tasks;
 using DSharpPlus;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Console;
+using Microsoft.Extensions.DependencyInjection;
+using System.Threading.Tasks;
 using DSharpPlus.CommandsNext;
 using GaiaPins.Data;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using LogLevel = DSharpPlus.LogLevel;
+using MSLogLevel = Microsoft.Extensions.Logging.LogLevel;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace GaiaPins
 {
@@ -18,7 +21,13 @@ namespace GaiaPins
         static async Task Main(string[] args)
         {
             var host = new HostBuilder()
-                .UseEnvironment(Environments.Development)
+                .ConfigureHostConfiguration(config =>
+                {
+                    config.SetBasePath(Directory.GetCurrentDirectory())
+                          .AddJsonFile("hostsettings.json", optional: true)
+                          .AddEnvironmentVariables(prefix: "PINS_")
+                          .AddCommandLine(args);
+                })
                 .ConfigureAppConfiguration((host, config) =>
                 {
                     config.SetBasePath(Directory.GetCurrentDirectory())
@@ -46,7 +55,11 @@ namespace GaiaPins
         {
             services.AddSingleton<Startup>();
             services.AddHostedService<PinsService>();
-            services.AddDbContext<PinsDbContext>(builder => builder.UseSqlite(context.Configuration["Database:ConnectionString"]));
+            services.AddDbContext<PinsDbContext>(builder =>
+            {
+                builder.UseSqlite(context.Configuration["Database:ConnectionString"])
+                       .ConfigureWarnings(c => c.Log((RelationalEventId.CommandExecuting, MSLogLevel.Debug)));
+            });
 
             var discordConfig = new DiscordConfiguration() { Token = context.Configuration["Discord:Token"], LogLevel = LogLevel.Debug };
             var discord = new DiscordClient(discordConfig);

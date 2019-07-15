@@ -1,5 +1,7 @@
 ﻿using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Logging;
 
 namespace GaiaPins.Data
 {
@@ -16,7 +18,7 @@ namespace GaiaPins.Data
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
-            optionsBuilder.UseSqlite("Data Source=pins.dev.db;");
+
         }
 
         public DbSet<GuildInfo> Guilds { get; set; }

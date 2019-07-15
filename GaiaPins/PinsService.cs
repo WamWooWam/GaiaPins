@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -43,10 +44,43 @@ namespace GaiaPins
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             await _client.ConnectAsync();
-
             _client.ChannelPinsUpdated += Client_ChannelPinsUpdated;
 
-            await Task.Delay(-1, cancellationToken);
+            var db = _services.GetService<PinsDbContext>();
+            await db.Database.MigrateAsync();
+
+            _logger.LogInformation("Loading Guild webhooks");
+
+            var info = db.Guilds
+                .Include(p => p.PinnedMessages);
+            await info.LoadAsync();
+
+            var failedGuilds = new List<GuildInfo>();
+            foreach (var guild in info)
+            {
+                try
+                {
+                    var server = await _client.GetGuildAsync((ulong)guild.Id);
+                    var hook = await _webhookClient.AddWebhookAsync((ulong)guild.WebhookId, guild.WebhookToken);
+
+                    _logger.LogInformation("Got Webhook! Guild: {0} Hook: {1}", server.Name, hook.Name);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Unable to get Webhook for Guild {0}!", guild.Id);
+                    failedGuilds.Add(guild);
+                }
+            }
+
+            foreach (var guild in failedGuilds)
+            {
+                guild.PinnedMessages.Clear();
+                db.Guilds.Remove(guild);
+            }
+
+            await db.SaveChangesAsync();
+
+            _logger.LogInformation("Loaded {0} Webhooks for {1} guilds with {2} errors!", _webhookClient.Webhooks.Count, await db.Guilds.CountAsync(), failedGuilds.Count);
         }
 
         private async Task Client_ChannelPinsUpdated(ChannelPinsUpdateEventArgs e)

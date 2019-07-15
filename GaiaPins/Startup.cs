@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using DSharpPlus;
 using DSharpPlus.CommandsNext;
 using DSharpPlus.EventArgs;
+using GaiaPins.Commands;
 using GaiaPins.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -39,42 +40,14 @@ namespace GaiaPins
             _commands = commands;
         }
 
-        public async Task Configure(IHost host) // task in case i need to do asynchronous work here
+        public Task Configure(IHost host) // task in case i need to do asynchronous work here
         {
-            using (host.Services.CreateScope())
-            {
-                var db = host.Services.GetService<PinsDbContext>();
-                await db.Database.MigrateAsync();
+            _client.DebugLogger.LogMessageReceived += DebugLogger_LogMessageReceived;
+            _commands.RegisterCommands<PinsCommands>();
+            _commands.CommandExecuted += _commands_CommandExecuted;
+            _commands.CommandErrored += _commands_CommandErrored;
 
-                _client.DebugLogger.LogMessageReceived += DebugLogger_LogMessageReceived;
-
-                _logger.LogInformation("Loading Guild webhooks");
-                var failedGuilds = new List<GuildInfo>();
-                foreach (var guild in db.Guilds)
-                {
-                    try
-                    {
-                        var server = await _client.GetGuildAsync((ulong)guild.Id);
-                        var hook = await _webhookClient.AddWebhookAsync((ulong)guild.WebhookId, guild.WebhookToken);
-
-                        _logger.LogInformation("Got Webhook! Guild: {0} Hook: {1}", server.Name, hook.Name);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Unable to get Webhook for Guild {0}!", guild.Id);
-                        failedGuilds.Add(guild);
-                    }
-                }
-
-                db.Guilds.RemoveRange(failedGuilds);
-                await db.SaveChangesAsync();
-
-                _logger.LogInformation("Loaded {0} Webhooks for {1} guilds with {2} errors!", _webhookClient.Webhooks.Count, await db.Guilds.CountAsync(), failedGuilds.Count);
-
-                _commands.RegisterCommands(Assembly.GetEntryAssembly());
-                _commands.CommandExecuted += _commands_CommandExecuted;
-                _commands.CommandErrored += _commands_CommandErrored;
-            }
+            return Task.CompletedTask;
         }
 
         private Task _commands_CommandExecuted(CommandExecutionEventArgs e)

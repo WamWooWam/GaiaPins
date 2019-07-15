@@ -109,7 +109,6 @@ namespace GaiaPins.Commands
                 .ToList();
 
             var messages = new List<DiscordMessage>();
-
             var message = await ctx.RespondAsync($"Migrating messages for {channels.Count()} channels, this may take a while!");
 
             foreach (var channel in channels)
@@ -142,9 +141,10 @@ namespace GaiaPins.Commands
                 return;
             }
 
-            _database.Remove(info);
-            await _database.SaveChangesAsync();
+            info.PinnedMessages.Clear();
+            _database.Guilds.Remove(info);
 
+            await _database.SaveChangesAsync();
             await ctx.RespondAsync("Pinned message redirection has been disabled in this server!");
         }
     }
