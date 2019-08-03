@@ -4,7 +4,6 @@ using DSharpPlus;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Console;
 using Microsoft.Extensions.DependencyInjection;
 using System.Threading.Tasks;
 using DSharpPlus.CommandsNext;

@@ -2,34 +2,41 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DSharpPlus;
 using DSharpPlus.CommandsNext;
+using DSharpPlus.CommandsNext.Exceptions;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
+using GaiaPins.Commands;
 using GaiaPins.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using LogLevel = DSharpPlus.LogLevel;
+using MSLogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace GaiaPins
 {
-    class PinsService : IHostedService
+    public class PinsService : IHostedService
     {
-        private ILogger<PinsService> _logger;
         private IServiceProvider _services;
+        private ILogger<PinsService> _logger;
+        private ILogger<CommandsNextExtension> _commandsLogger;
+        private ILogger<DiscordClient> _clientLogger;
         private DiscordClient _client;
         private DiscordWebhookClient _webhookClient;
         private CommandsNextExtension _commands;
-        private static readonly HttpClient _httpClient = new HttpClient();
 
         public PinsService(
-            ILogger<PinsService> logger,
             IServiceProvider services,
+            ILogger<PinsService> logger,
+            ILogger<DiscordClient> clientLogger,
+            ILogger<CommandsNextExtension> commandsLogger,
             DiscordClient client,
             DiscordWebhookClient webhookClient,
             CommandsNextExtension commands)
@@ -39,12 +46,19 @@ namespace GaiaPins
             _client = client;
             _webhookClient = webhookClient;
             _commands = commands;
+            _commandsLogger = commandsLogger;
+            _clientLogger = clientLogger;
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
-            await _client.ConnectAsync();
+            _client.DebugLogger.LogMessageReceived += DebugLogger_LogMessageReceived;
             _client.ChannelPinsUpdated += Client_ChannelPinsUpdated;
+            _commands.CommandExecuted += Commands_CommandExecuted;
+            _commands.CommandErrored += Commands_CommandErrored;
+            _commands.RegisterCommands<PinsCommands>();
+
+            await _client.ConnectAsync();
 
             var db = _services.GetService<PinsDbContext>();
             await db.Database.MigrateAsync();
@@ -81,6 +95,38 @@ namespace GaiaPins
             await db.SaveChangesAsync();
 
             _logger.LogInformation("Loaded {0} Webhooks for {1} guilds with {2} errors!", _webhookClient.Webhooks.Count, await db.Guilds.CountAsync(), failedGuilds.Count);
+        }
+
+        private Task Commands_CommandExecuted(CommandExecutionEventArgs e)
+        {
+            _commandsLogger.LogInformation("Command '{0}' executed by @{1}#{2} successfully!", e.Command.Name, e.Context.User.Username, e.Context.User.Discriminator);
+            return Task.CompletedTask;
+        }
+
+        private async Task Commands_CommandErrored(CommandErrorEventArgs e)
+        {
+            var exception = e.Exception;
+            if (e.Exception is TargetInvocationException tie)
+            {
+                exception = tie.InnerException;
+            }
+
+            _commandsLogger.LogError(exception, "Command '{0}' failed to execute!", e.Command?.Name);
+
+            if (e.Context?.Channel != null)
+            {
+                if (exception is ChecksFailedException)
+                {
+                    await e.Context.Channel.SendMessageAsync(
+                        $"It looks like either you or the bot don't have permission to run this command! Sorry!");
+                }
+                else
+                {
+                    await e.Context.Channel.SendMessageAsync(
+                        $"Something fucked up when running that command, and an {exception.GetType().Name} occured.\n" +
+                        $"This is probably my fault.");
+                }
+            }
         }
 
         private async Task Client_ChannelPinsUpdated(ChannelPinsUpdateEventArgs e)
@@ -125,7 +171,29 @@ namespace GaiaPins
             }
         }
 
-        public static async Task CopyPinAsync(DiscordWebhook hook, DiscordMessage message, GuildInfo info, PinsDbContext db)
+        private void DebugLogger_LogMessageReceived(object sender, DebugLogMessageEventArgs e)
+        {
+            var level = e.Level switch
+            {
+                LogLevel.Critical => MSLogLevel.Critical,
+                LogLevel.Error => MSLogLevel.Error,
+                LogLevel.Warning => MSLogLevel.Warning,
+                LogLevel.Info => MSLogLevel.Information,
+                LogLevel.Debug => MSLogLevel.Debug,
+                _ => MSLogLevel.Trace
+            };
+
+            if (e.Exception != null)
+            {
+                _clientLogger.Log(level, e.Exception, e.Message);
+            }
+            else
+            {
+                _clientLogger.Log(level, e.Message);
+            }
+        }
+
+        public async Task CopyPinAsync(DiscordWebhook hook, DiscordMessage message, GuildInfo info, PinsDbContext db)
         {
             var content = new StringBuilder();
             var attachments = message.Attachments.ToList();

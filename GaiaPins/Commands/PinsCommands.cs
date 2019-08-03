@@ -18,14 +18,17 @@ namespace GaiaPins.Commands
     {
         private ILogger<PinsCommands> _logger;
         private PinsDbContext _database;
+        private PinsService _service;
         private DiscordWebhookClient _webhookClient;
 
         public PinsCommands(ILogger<PinsCommands> logger,
                             PinsDbContext database,
-                            DiscordWebhookClient webhookClient)
+                            DiscordWebhookClient webhookClient,
+                            PinsService service)
         {
             _logger = logger;
             _database = database;
+            _service = service;
             _webhookClient = webhookClient;
         }
 
@@ -125,7 +128,7 @@ namespace GaiaPins.Commands
 
             foreach (var msg in messages.OrderBy(m => m.Timestamp))
             {
-                await PinsService.CopyPinAsync(hook, msg, info, _database);
+                await _service.CopyPinAsync(hook, msg, info, _database);
             }
 
             await ctx.RespondAsync("Pins copied!");
