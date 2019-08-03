@@ -7,6 +7,7 @@ using DSharpPlus.CommandsNext;
 using DSharpPlus.CommandsNext.Attributes;
 using DSharpPlus.Entities;
 using GaiaPins.Data;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace GaiaPins.Commands
@@ -93,7 +94,10 @@ namespace GaiaPins.Commands
         [RequireUserPermissions(Permissions.ManageWebhooks | Permissions.ManageMessages)]
         public async Task MigrateAsync(CommandContext ctx)
         {
-            var info = await _database.FindAsync<GuildInfo>((long)ctx.Guild.Id);
+            var info = await _database.Guilds
+                .Include(p => p.PinnedMessages)
+                .FirstOrDefaultAsync(b => b.Id == (long)ctx.Guild.Id);
+
             if (info == null)
             {
                 // TODO: prompt to reconfigure/setup
@@ -116,6 +120,7 @@ namespace GaiaPins.Commands
                 messages.AddRange(await channel.GetPinnedMessagesAsync());
             }
 
+            messages = messages.Where(m => !info.PinnedMessages.Any(i => i.Id == (long)m.Id)).ToList();
             await message.ModifyAsync($"Migrating {messages.Count} messages from {channels.Count()} channels, this may take a while!");
 
             foreach (var msg in messages.OrderBy(m => m.Timestamp))
